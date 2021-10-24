@@ -1,5 +1,3 @@
-
-using System.Reflection.Metadata;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,7 +50,7 @@ namespace PrayerTime
             }
             catch(Exception e)
             {
-                _logger.LogCritical(e.Message);
+                _logger.LogWarning(e.Message);
             }
         }
 
@@ -83,7 +81,7 @@ namespace PrayerTime
 
         private async Task BotOnMessageRecieved(ITelegramBotClient client, Message message)
         {
-            if(!await _storage.ExistsAsync(message.Chat.Id))
+            if(message.Text == "/start")
             {
                 var user = new BotUser(
                     chatId: message.Chat.Id,
@@ -97,16 +95,16 @@ namespace PrayerTime
                 {
                     _logger.LogInformation($"New user added: {user.ChatID} {user.Username}");
                 }
-            }
-            else
-            {
-                _logger.LogInformation("User exists!");
+                else
+                {
+                    _logger.LogInformation("User already exists");
+                }
             }
             if(message.Location != null)
             {
                 await client.SendTextMessageAsync(
                     message.Chat.Id,
-                    "Location successfully accepted",
+                    "Lokatsiyangiz muvaffaqiyatli qabul qilindi",
                     replyToMessageId: message.MessageId,
                     replyMarkup: Buttons.MenuButtons()
                 );
@@ -115,34 +113,52 @@ namespace PrayerTime
                 user.Latitude = message.Location.Latitude;
                 await _storage.UpdateUserAsync(user);
             }
-            var _user = await _storage.GetUserAsync(message.Chat.Id);
-            var a = message.Text switch
+            else
             {
-                "/start"    => await client.SendTextMessageAsync(
-                                message.Chat.Id,
-                                "Botga xush kelibsiz.",
-                                ParseMode.Markdown,
-                                replyMarkup: Buttons.GetLocationButton()),
-                "Settings"  => await client.SendTextMessageAsync(
-                                message.Chat.Id,
-                                "Settings",
-                                ParseMode.Markdown,
-                                replyMarkup: Buttons.SettingsButtons()),
-                "Today"     => await client.SendTextMessageAsync(
-                                message.Chat.Id,
-                                await _timings.getTodayTimings(_user.Longitude ,_user.Latitude),
-                                ParseMode.Markdown,
-                                replyMarkup: Buttons.MenuButtons()),
-                "Back to menu" => await client.SendTextMessageAsync(
-                                message.Chat.Id,
-                                "Back to menu",
-                                ParseMode.Markdown,
-                                replyMarkup: Buttons.MenuButtons()),
-                _           => await client.SendTextMessageAsync(
-                                message.Chat.Id,
-                                "Hozircha shu.",
-                                ParseMode.Markdown)
-            };
+                var _user = await _storage.GetUserAsync(message.Chat.Id);
+                var a = message.Text switch
+                {
+                    "/start"    => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    "Botga xush kelibsiz.\nLokatsiyangizni jo'natmasangiz bot ishlamaydi.",
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.GetLocationButton()),
+                    "Sozlamalar"  => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    "Sozlamalardan birini tanlang",
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.SettingsButtons(_user.Notifications)),
+                    "Bugungi namoz vaqtlari"     => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    await _timings.getTodayTimings(_user.Longitude ,_user.Latitude),
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.MenuButtons()),
+                    "Ertangi namoz vaqtlari"  => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    await _timings.getTomorrowTimings(_user.Longitude, _user.Latitude),
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.MenuButtons()),
+                    "Menyuga qaytish" => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    "Back to menu",
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.MenuButtons()),
+                    "Bildirishnomalarni yoqish" => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    $"Bildirishnomalar yoqildi{_user.setNotification()}",
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.SettingsButtons(_user.Notifications)),
+                    "Bildirishnomalarni o'chirish" => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    $"Bildirishnomalar o'chirildi{_user.setNotification()}",
+                                    ParseMode.Markdown,
+                                    replyMarkup: Buttons.SettingsButtons(_user.Notifications)),
+                    _           => await client.SendTextMessageAsync(
+                                    message.Chat.Id,
+                                    "Hozircha shu.",
+                                    ParseMode.Markdown)
+                };
+            }
         }
     }
 }
